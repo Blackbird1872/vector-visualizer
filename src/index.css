@@ -1,0 +1,24 @@
+@import 'tailwindcss';
+
+@layer components {
+  .graph {
+    @apply border pb-0
+  }
+
+  .graph text {
+    fill: black;
+    font-size: 14px;
+    font-family: system-ui, sans-serif;
+    user-select: none;
+    paint-order: stroke;
+    stroke: white;
+    stroke-width: 3px;
+    stroke-linejoin: round;
+  }
+
+  html, body, #root {
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+}
