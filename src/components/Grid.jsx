@@ -97,7 +97,7 @@ const Grid = ({
     axisStrokeWidth=3,
     vectors=[]
 }) => {
-    const DEFAULT_CELL_SIZE = 20;
+    const DEFAULT_CELL_SIZE = 15;
     const LABEL_OFFSET_Y = 20;
     const LABEL_OFFSET_BOTTOM = 10;
     const LABEL_OFFSET_X = 7;
@@ -145,7 +145,10 @@ const Grid = ({
         if (now - lastScrollTime.current < THROTTLE_MS) return;
         lastScrollTime.current = now;
 
+        let scaleFactor = 1;
+
         setCellState(prevState => {
+            const oldCellSize = DEFAULT_CELL_SIZE * prevState.scale;
             let scale = prevState.scale - (e.deltaY * 0.1) / DEFAULT_CELL_SIZE;
             let unitSize = prevState.unitSize;
             let majorLines = prevState.majorLines;
@@ -207,6 +210,10 @@ const Grid = ({
                 }
             }
             
+            const oldGridSpacing = oldCellSize / (prevState.unitSize * prevState.mult);
+            const newGridSpacing = (DEFAULT_CELL_SIZE * scale) / (unitSize * mult);
+            scaleFactor = newGridSpacing / oldGridSpacing;
+            
             return {
                 ...prevState,
                 scale,
@@ -214,6 +221,13 @@ const Grid = ({
                 majorLines,
                 mult
             };
+        })
+
+        setAxisPos(prevState => {
+            return {
+                x: prevState.x - (scaleFactor - 1) * (e.clientX - prevState.x),
+                y: prevState.y - (scaleFactor - 1) * (e.clientY - prevState.y)
+            }
         })
     }, [])
  
@@ -265,7 +279,7 @@ const Grid = ({
                     width={dimensions.width}
                     stroke={isMajor ? majorGridlineStroke : gridlineStroke}
                     strokeWidth={isMajor ? gridlineStrokeWidth + 1 : gridlineStrokeWidth}
-                    label={i * cellState.unitSize * cellState.mult}
+                    label={Math.round(i * cellState.unitSize * cellState.mult * 1e10) / 1e10}
                     labelOffsetY={LABEL_OFFSET_Y}
                     labelOffsetBottom={LABEL_OFFSET_BOTTOM}
                     axisLabelMargin={AXIS_LABEL_MARGIN}
@@ -285,7 +299,7 @@ const Grid = ({
                     width={dimensions.width}
                     stroke={isMajor ? majorGridlineStroke : gridlineStroke}
                     strokeWidth={isMajor ? gridlineStrokeWidth + 1 : gridlineStrokeWidth}
-                    label={i * cellState.unitSize * cellState.mult}
+                    label={Math.round(i * cellState.unitSize * cellState.mult * 1e10) / 1e10}
                     labelOffsetY={LABEL_OFFSET_Y}
                     labelOffsetBottom={LABEL_OFFSET_BOTTOM}
                     axisLabelMargin={AXIS_LABEL_MARGIN}
@@ -319,7 +333,7 @@ const Grid = ({
                     width={dimensions.width}
                     stroke={isMajor ? majorGridlineStroke : gridlineStroke}
                     strokeWidth={isMajor ? gridlineStrokeWidth + 1 : gridlineStrokeWidth}
-                    label={i * cellState.unitSize * cellState.mult}
+                    label={Math.round(i * cellState.unitSize * cellState.mult * 1e10) / 1e10}
                     yAxisRef={el => yAxisRefs.current[i] = el}
                     yAxisWidth={yAxisWidths[i]}
                     labelOffsetX={LABEL_OFFSET_X}
@@ -340,7 +354,7 @@ const Grid = ({
                     width={dimensions.width}
                     stroke={isMajor ? majorGridlineStroke : gridlineStroke}
                     strokeWidth={isMajor ? gridlineStrokeWidth + 1 : gridlineStrokeWidth}
-                    label={i * cellState.unitSize * cellState.mult}
+                    label={Math.round(i * cellState.unitSize * cellState.mult * 1e10) / 1e10}
                     yAxisRef={el => yAxisRefs.current[i] = el}
                     labelOffsetX={LABEL_OFFSET_X}
                     labelPadding={LABEL_PADDING}
