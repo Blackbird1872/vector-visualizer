@@ -8,13 +8,16 @@ An interactive web-based vector visualization tool built with React and Vite. Th
 
 - **Interactive Cartesian Grid**: Full-featured coordinate system with customizable axes and gridlines
 - **Pan & Zoom**: 
-  - Click and drag to pan the grid
-  - Mouse wheel to zoom in/out with intelligent scaling
-  - Smooth transitions with throttled updates for optimal performance
+  - Click and drag to pan the grid anywhere in the infinite coordinate plane
+  - Mouse wheel to zoom in/out with intelligent scaling that centers on your cursor
+  - Smooth transitions with throttled updates (60fps) for optimal performance
 - **Adaptive Scaling**: Automatically adjusts grid unit sizes and intervals as you zoom
-- **Vector Rendering**: Display vectors with arrow heads showing direction
-- **Responsive Design**: Adapts to window size changes
+- **Smart Label Positioning**: Grid labels stick to screen edges (bottom for X-axis, right for Y-axis) when axes move off-screen
+- **Vector Rendering**: Display vectors with arrow heads showing direction and magnitude
+- **Responsive Design**: Adapts to window size changes in real-time
 - **Customizable Appearance**: Configure gridline colors, stroke widths, and axis styling
+- **Infinite Canvas**: Pan and zoom to any coordinate without bounds
+- **Scientific Notation**: Automatic formatting for very large or small numbers
 
 ## Demo
 
@@ -127,9 +130,12 @@ The `Grid` component accepts the following optional props:
 
 ## Controls
 
-- **Pan**: Click and drag anywhere on the grid
+- **Pan**: Click and drag anywhere on the grid to move around the coordinate plane
 - **Zoom**: Use mouse wheel to zoom in/out
-- The grid automatically adjusts scale and unit intervals for optimal visibility
+  - Zoom centers on your cursor position for precise navigation
+  - The grid automatically adjusts scale and unit intervals for optimal visibility
+  - Labels stick to screen edges for consistent readability
+- **Reset**: Refresh the page to return to the origin (0, 0)
 
 ## Technical Details
 
@@ -152,15 +158,20 @@ The `Grid` component accepts the following optional props:
 - Throttled mouse events (60fps) for smooth interactions
 - `useMemo` hooks to prevent unnecessary re-renders of gridlines
 - `useCallback` for optimized event handlers
-- Dynamic gridline generation (only renders visible gridlines)
+- Efficient gridline rendering: only calculates and renders visible gridlines
+- Smart range calculation prevents performance issues at extreme zoom levels
+- Automatic cleanup of off-screen elements
 
 ### Scaling Algorithm
 
 The grid implements an intelligent scaling system that:
-1. Maintains optimal visual density as you zoom
-2. Switches between unit sizes (1, 2, 5) automatically
-3. Adjusts major gridline intervals (every 4th or 5th line)
-4. Handles decimal multipliers for extreme zoom levels
+1. Maintains optimal visual density as you zoom in and out
+2. Automatically switches between unit sizes (1, 2, 5) for clean intervals
+3. Adjusts major gridline intervals (every 4th or 5th line) based on unit size
+4. Handles decimal multipliers for extreme zoom levels (0.001 to 1000+)
+5. Uses scientific notation for very large or very small numbers (< 0.001 or ≥ 10000)
+6. Calculates visible range efficiently to prevent rendering thousands of off-screen gridlines
+7. Preserves zoom center point at cursor position for intuitive navigation
 
 ## Project Structure
 
@@ -194,6 +205,13 @@ This application works in all modern browsers that support:
 - ES6+ JavaScript features
 - SVG rendering
 - CSS Grid and Flexbox
+- Mouse wheel events for zooming
+- High precision floating point calculations
+
+Tested on:
+- Chrome/Edge 90+
+- Firefox 88+
+- Safari 14+
 
 ## Contributing
 

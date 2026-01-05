@@ -28,7 +28,12 @@ const XGridline = ({ gridX, getPos, axisY, height, width, stroke, strokeWidth, l
         {showLabel && (
             <text
                 x={xPos}
-                y={(axisY < height - axisLabelMargin) ? axisY + labelOffsetY : height - labelOffsetBottom}
+                y={(axisY > height - axisLabelMargin) 
+                    ? height - labelOffsetBottom 
+                    : (axisY < 0) 
+                    ? labelOffsetY
+                    : axisY + labelOffsetY
+                }
                 textAnchor='middle'
             >{label}</text>
         )}
@@ -45,7 +50,10 @@ const YGridline = ({ gridY, getPos, axisX, height, width, stroke, strokeWidth, l
         />
         {showLabel && (
             <text ref={yAxisRef}
-                x={Math.max(axisX - labelOffsetX, (yAxisWidth || 0) + labelPadding)}
+                x={(axisX > width)
+                    ? width - labelOffsetX
+                    : Math.max(axisX - labelOffsetX, (yAxisWidth || 0) + labelPadding)
+                }
                 y={yPos}
                 textAnchor='end'
                 dominantBaseline='middle'
@@ -104,6 +112,19 @@ const Grid = ({
     const LABEL_PADDING = 10;
     const AXIS_LABEL_MARGIN = 30;
 
+    const formatLabel = (num) => {
+        if (num === 0) return '0';
+        const rounded = Math.round(num * 1e10) / 1e10;
+        const absNum = Math.abs(rounded);
+        
+        // Use scientific notation for very small or very large numbers
+        if (absNum < 0.001 || absNum >= 10000) {
+            return rounded.toExponential(2);
+        }
+        
+        return rounded.toString();
+    };
+
     const dimensions = useWindowDimensions()
     const [cellState, setCellState] = useState({
         scale: 2,
@@ -137,6 +158,7 @@ const Grid = ({
 
     const THROTTLE_MS = 16 // ~60fps
     const lastScrollTime = useRef(0)
+    const scaleFactorRef = useRef(1)
 
     const handleMouseScroll = useCallback((e) => {
         e.preventDefault()
@@ -145,14 +167,14 @@ const Grid = ({
         if (now - lastScrollTime.current < THROTTLE_MS) return;
         lastScrollTime.current = now;
 
-        let scaleFactor = 1;
-
         setCellState(prevState => {
             const oldCellSize = DEFAULT_CELL_SIZE * prevState.scale;
             let scale = prevState.scale - (e.deltaY * 0.1) / DEFAULT_CELL_SIZE;
             let unitSize = prevState.unitSize;
             let majorLines = prevState.majorLines;
             let mult = prevState.mult;
+
+            // if ((mult > 1000 && scale < prevState.scale) || (mult < 0.001 && scale > prevState.scale)) {return prevState}
 
             while (true) {
                 if (unitSize == 1) { // Default scale = 2 majorLines = 5
@@ -212,7 +234,7 @@ const Grid = ({
             
             const oldGridSpacing = oldCellSize / (prevState.unitSize * prevState.mult);
             const newGridSpacing = (DEFAULT_CELL_SIZE * scale) / (unitSize * mult);
-            scaleFactor = newGridSpacing / oldGridSpacing;
+            scaleFactorRef.current = newGridSpacing / oldGridSpacing;
             
             return {
                 ...prevState,
@@ -225,8 +247,8 @@ const Grid = ({
 
         setAxisPos(prevState => {
             return {
-                x: prevState.x - (scaleFactor - 1) * (e.clientX - prevState.x),
-                y: prevState.y - (scaleFactor - 1) * (e.clientY - prevState.y)
+                x: prevState.x - (scaleFactorRef.current - 1) * (e.clientX - prevState.x),
+                y: prevState.y - (scaleFactorRef.current - 1) * (e.clientY - prevState.y)
             }
         })
     }, [])
@@ -268,7 +290,17 @@ const Grid = ({
 
     const xGridlines = useMemo(() => {
         const gridlines = [];
-        for (let i = 1; getPos((i-2) * cellState.unitSize * cellState.mult, null).x < dimensions.width; i++) {
+        
+        // Calculate visible range of gridlines based on screen position
+        const leftScreenEdge = 0;
+        const rightScreenEdge = dimensions.width;
+        
+        // Convert screen edges to grid indices
+        const minI = Math.floor((leftScreenEdge - axisPos.x) / cellSize) - 1;
+        const maxI = Math.ceil((rightScreenEdge - axisPos.x) / cellSize) + 1;
+        
+        for (let i = minI; i <= maxI; i++) {
+            if (i === 0) continue; // Skip the axis itself
             const isMajor = i % cellState.majorLines === 0;
             gridlines.push(
                 <XGridline key={i}
@@ -279,7 +311,7 @@ const Grid = ({
                     width={dimensions.width}
                     stroke={isMajor ? majorGridlineStroke : gridlineStroke}
                     strokeWidth={isMajor ? gridlineStrokeWidth + 1 : gridlineStrokeWidth}
-                    label={Math.round(i * cellState.unitSize * cellState.mult * 1e10) / 1e10}
+                    label={formatLabel(i * cellState.unitSize * cellState.mult)}
                     labelOffsetY={LABEL_OFFSET_Y}
                     labelOffsetBottom={LABEL_OFFSET_BOTTOM}
                     axisLabelMargin={AXIS_LABEL_MARGIN}
@@ -288,41 +320,33 @@ const Grid = ({
             );
         }
 
-        for (let i = -1; getPos((i+2) * cellState.unitSize * cellState.mult, null).x > 0; i--) {
-            const isMajor = i % cellState.majorLines === 0;
-            gridlines.push(
-                <XGridline key={i}
-                    gridX={i * cellState.unitSize * cellState.mult}
-                    getPos={getPos}
-                    axisY={axisPos.y}
-                    height={dimensions.height}
-                    width={dimensions.width}
-                    stroke={isMajor ? majorGridlineStroke : gridlineStroke}
-                    strokeWidth={isMajor ? gridlineStrokeWidth + 1 : gridlineStrokeWidth}
-                    label={Math.round(i * cellState.unitSize * cellState.mult * 1e10) / 1e10}
-                    labelOffsetY={LABEL_OFFSET_Y}
-                    labelOffsetBottom={LABEL_OFFSET_BOTTOM}
-                    axisLabelMargin={AXIS_LABEL_MARGIN}
-                    showLabel={isMajor}
-                />
-            );
-        };
-
         return gridlines;
     }, [
         getPos,
         dimensions.width,
         dimensions.height, 
+        axisPos.x,
         axisPos.y, 
         gridlineStroke,
         majorGridlineStroke, 
         gridlineStrokeWidth,
-        cellState
+        cellState,
+        cellSize
     ])
 
     const yGridlines = useMemo(() => {
         const gridlines = [];
-        for (let i = 1; getPos(null, (i-2) * cellState.unitSize * cellState.mult).y > 0; i++) {
+        
+        // Calculate visible range of gridlines based on screen position
+        const topScreenEdge = 0;
+        const bottomScreenEdge = dimensions.height;
+        
+        // Convert screen edges to grid indices (note: Y is inverted)
+        const maxI = Math.ceil((axisPos.y - topScreenEdge) / cellSize) + 1;
+        const minI = Math.floor((axisPos.y - bottomScreenEdge) / cellSize) - 1;
+        
+        for (let i = minI; i <= maxI; i++) {
+            if (i === 0) continue; // Skip the axis itself
             const isMajor = i % cellState.majorLines === 0;
             gridlines.push(
                 <YGridline key={i}
@@ -333,7 +357,7 @@ const Grid = ({
                     width={dimensions.width}
                     stroke={isMajor ? majorGridlineStroke : gridlineStroke}
                     strokeWidth={isMajor ? gridlineStrokeWidth + 1 : gridlineStrokeWidth}
-                    label={Math.round(i * cellState.unitSize * cellState.mult * 1e10) / 1e10}
+                    label={formatLabel(i * cellState.unitSize * cellState.mult)}
                     yAxisRef={el => yAxisRefs.current[i] = el}
                     yAxisWidth={yAxisWidths[i]}
                     labelOffsetX={LABEL_OFFSET_X}
@@ -341,26 +365,6 @@ const Grid = ({
                     showLabel={isMajor}
                 />
             );
-        };
-
-        for (let i = -1; getPos(null, (i+2) * cellState.unitSize * cellState.mult).y < dimensions.height; i--) {
-            const isMajor = i % cellState.majorLines === 0;
-            gridlines.push(
-                <YGridline key={i}
-                    gridY={i * cellState.unitSize * cellState.mult}
-                    getPos={getPos}
-                    axisX={axisPos.x}
-                    height={dimensions.height}
-                    width={dimensions.width}
-                    stroke={isMajor ? majorGridlineStroke : gridlineStroke}
-                    strokeWidth={isMajor ? gridlineStrokeWidth + 1 : gridlineStrokeWidth}
-                    label={Math.round(i * cellState.unitSize * cellState.mult * 1e10) / 1e10}
-                    yAxisRef={el => yAxisRefs.current[i] = el}
-                    labelOffsetX={LABEL_OFFSET_X}
-                    labelPadding={LABEL_PADDING}
-                    showLabel={isMajor}
-                />
-            )
         }
 
         return gridlines
@@ -369,21 +373,32 @@ const Grid = ({
         dimensions.width,
         dimensions.height, 
         axisPos.x, 
+        axisPos.y,
         gridlineStroke,
         majorGridlineStroke, 
         gridlineStrokeWidth, 
         yAxisWidths,
-        cellState
+        cellState,
+        cellSize
     ])
 
     const vectorComponents = useMemo(() => {
-        return vectors.map((vector, index) => (
-            <Vector key={index}
-                vector={vector}
-                getPos={getPos}
-            />
-        ));
-    }, [vectors, getPos])
+        const minLength = 0.1 * cellState.unitSize * cellState.mult;
+        
+        return vectors
+            .filter(vector => {
+                const dx = vector.xEnd - vector.xStart;
+                const dy = vector.yEnd - vector.yStart;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                return length >= minLength;
+            })
+            .map((vector, index) => (
+                <Vector key={index}
+                    vector={vector}
+                    getPos={getPos}
+                />
+            ));
+    }, [vectors, getPos, cellState])
 
     return (
         <div className={`${width} ${height}`}>
